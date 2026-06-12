@@ -161,7 +161,7 @@ body { min-height: 100dvh; padding-bottom: calc(60px + var(--bot)); overflow-x: 
 
 /* ── FORM ── */
 .fg { margin-bottom: 16px; }
-.fg-label { font-size: 12px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 7px; display: block; }
+.fg-label { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; display: block; }
 .fi-input {
   width: 100%; padding: 13px 14px; border-radius: 12px;
   border: 1.5px solid var(--gray2); background: var(--gray1);
@@ -172,9 +172,25 @@ body { min-height: 100dvh; padding-bottom: calc(60px + var(--bot)); overflow-x: 
 .fi-input.big { font-size: 28px; font-weight: 700; text-align: center; letter-spacing: -0.5px; padding: 16px; }
 .fi-textarea { resize: none; height: 70px; font-size: 14px; }
 
-.seg { display: flex; background: var(--gray1); border-radius: 10px; padding: 3px; gap: 3px; }
-.seg-btn { flex: 1; padding: 8px 6px; border-radius: 8px; border: none; background: transparent; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text2); transition: all .15s; text-align: center; }
-.seg-btn.on { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: 0 1px 4px rgba(0,0,0,0.1); }
+.seg { display: flex; gap: 8px; }
+.seg-btn {
+  flex: 1; padding: 12px 6px; border-radius: 12px;
+  border: 2px solid var(--gray2); background: var(--gray1);
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  color: var(--text2); transition: all .18s; text-align: center;
+  line-height: 1.3;
+}
+.seg-btn.on {
+  border-color: var(--blue); background: var(--blue);
+  color: #fff; font-weight: 700;
+  box-shadow: 0 2px 10px rgba(0,113,227,0.35);
+}
+/* Para-specific active colors */
+.seg-btn.on[onclick*="javier"] { background: #0071E3; border-color: #0071E3; }
+.seg-btn.on[onclick*="pame"]   { background: #FF2D55; border-color: #FF2D55; }
+.seg-btn.on[onclick*="familia"]{ background: #34C759; border-color: #34C759; color: #fff; }
+.seg-btn.on[onclick*="fijo"]   { background: #FF9500; border-color: #FF9500; }
+.seg-btn.on[onclick*="variable"]{ background: #32ADE6; border-color: #32ADE6; }
 
 .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cat-item { padding: 10px 10px; border-radius: 12px; border: 1.5px solid var(--gray2); background: var(--gray1); font-size: 13px; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px; color: var(--text); transition: all .12s; }
@@ -558,6 +574,7 @@ const PE = {javier:'👨',pame:'👩',familia:'🏠'};
 const PC = {javier:'#0071E3',pame:'#FF2D55',familia:'#34C759'};
 
 const CATS = [
+  {id:'supermercado',e:'🛒',l:'Supermercado'},{id:'ubereats',e:'🍔',l:'Uber Eats'},
   {id:'vivienda',e:'🏠',l:'Vivienda'},{id:'alimentacion',e:'🍽️',l:'Alimentación'},
   {id:'transporte',e:'🚗',l:'Transporte'},{id:'servicios',e:'💡',l:'Servicios'},
   {id:'salud',e:'💊',l:'Salud'},{id:'educacion',e:'📚',l:'Educación'},
@@ -568,14 +585,15 @@ const CATS = [
   {id:'tecnologia',e:'📱',l:'Tecnología'},{id:'deporte',e:'🏋️',l:'Deporte'},
   {id:'viajes',e:'✈️',l:'Viajes'},{id:'otros',e:'❓',l:'Otros'},
 ];
-const CC = {vivienda:'#1B2A4A',alimentacion:'#34C759',transporte:'#0071E3',servicios:'#FF9500',salud:'#FF3B30',educacion:'#32ADE6',entretenimiento:'#AF52DE',suscripciones:'#32ADE6',vestimenta:'#FF9500',mascotas:'#34C759',hogar:'#8E8E93',bienestar:'#32ADE6',salidas:'#FF9500',regalos:'#AF52DE',tecnologia:'#1B2A4A',deporte:'#34C759',viajes:'#0071E3',otros:'#8E8E93'};
+const CC = {supermercado:'#34C759',ubereats:'#06C167',vivienda:'#1B2A4A',alimentacion:'#34C759',transporte:'#0071E3',servicios:'#FF9500',salud:'#FF3B30',educacion:'#32ADE6',entretenimiento:'#AF52DE',suscripciones:'#32ADE6',vestimenta:'#FF9500',mascotas:'#34C759',hogar:'#8E8E93',bienestar:'#32ADE6',salidas:'#FF9500',regalos:'#AF52DE',tecnologia:'#1B2A4A',deporte:'#34C759',viajes:'#0071E3',otros:'#8E8E93'};
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let expenses = [], fbDb = null, fbUnsub = null;
 let cm = new Date().getMonth(), cy = new Date().getFullYear();
 let activeFilter = 'todos';
 let editId = null; // null = new, string = editing
-let selPara = 'javier', selTipo = 'variable', selCat = '';
+let selPara = localStorage.getItem('lastPara') || 'javier';
+let selTipo = 'variable', selCat = '';
 let budgets = {total:0, cats:{}, alerts:{}, totalAlert:false};
 let metas = [];
 let shownAlerts = new Set();
@@ -606,7 +624,10 @@ function connectFB() {
       if (fbUnsub) fbUnsub();
       fbUnsub = fbDb.collection('expenses').onSnapshot(
         snap => {
-          expenses = snap.docs.map(d => ({id:d.id,...d.data()})).sort((a,b)=>(b.ts||0)-(a.ts||0));
+          // docId = Firestore document ID, stored as item.docId
+          // item.id = legacy internal id field (kept for compatibility)
+          expenses = snap.docs.map(d => ({...d.data(), docId:d.id, id:d.id}))
+            .sort((a,b)=>(b.ts||0)-(a.ts||0));
           saveLocal(); renderAll(); setFBStatus('ok','Sincronizado');
           checkAlerts();
         },
@@ -640,7 +661,7 @@ function saveMetas_() { localStorage.setItem('gh_metas', JSON.stringify(metas));
 // ── MODAL ADD / EDIT ──────────────────────────────────────────────────────────
 function openAdd() {
   editId = null;
-  selPara = 'javier'; selTipo = 'variable'; selCat = '';
+  selPara = localStorage.getItem('lastPara') || 'javier'; selTipo = 'variable'; selCat = '';
   document.getElementById('inMonto').value = '';
   document.getElementById('inDesc').value = '';
   document.getElementById('inNota').value = '';
@@ -673,7 +694,7 @@ window.openEdit = openEdit;
 
 function closeAdd() { document.getElementById('ovGasto').classList.remove('open'); }
 
-function setPara(p, el) { selPara = p; document.querySelectorAll('#segPara .seg-btn').forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
+function setPara(p, el) { selPara = p; localStorage.setItem('lastPara', p); document.querySelectorAll('#segPara .seg-btn').forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
 function setTipo(t, el) { selTipo = t; document.querySelectorAll('#segTipo .seg-btn').forEach(b=>b.classList.remove('on')); el.classList.add('on'); }
 function renderSegPara() {
   document.querySelectorAll('#segPara .seg-btn').forEach(b => {
@@ -710,13 +731,14 @@ async function saveExpense() {
   if (fbDb) {
     try {
       if (editId) {
-        await fbDb.collection('expenses').doc(editId).update(data);
+        // set with merge overwrites fields without deleting others
+        await fbDb.collection('expenses').doc(editId).set(data, {merge: true});
         toast('✅ Actualizado');
       } else {
-        await fbDb.collection('expenses').add({...data, id: Date.now().toString()});
+        const ref = await fbDb.collection('expenses').add(data);
         toast('✅ Guardado');
       }
-    } catch(e) { toast('Error: ' + e.message); }
+    } catch(e) { toast('Error Firebase: ' + e.message); console.error(e); }
   } else {
     if (editId) {
       const idx = expenses.findIndex(e => e.id === editId);
@@ -739,8 +761,8 @@ async function confirmDelete() {
   if (fbDb) {
     try {
       await fbDb.collection('expenses').doc(id).delete();
-      toast('Eliminado');
-    } catch(e) { toast('Error al eliminar: ' + e.message); }
+      toast('🗑️ Eliminado');
+    } catch(e) { toast('Error al eliminar: ' + e.message); console.error(e); }
   } else {
     expenses = expenses.filter(e => e.id !== id);
     saveLocal(); renderAll();
