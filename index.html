@@ -11,6 +11,7 @@
 <!-- Firebase SDK via CDN compatible con archivo local -->
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-app-compat.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-firestore-compat.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/firebase@10.12.2/firebase-auth-compat.min.js"></script>
 
 <style>
 :root {
@@ -409,23 +410,48 @@ function connectFirebase() {
     }
 
     fbDb = firebase.firestore(app);
+    const auth = firebase.auth(app);
 
     if (fbUnsub) fbUnsub();
 
-    fbUnsub = fbDb.collection('expenses')
-      .onSnapshot(
-        snap => {
-          expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-            .sort((a,b) => (b.ts||0) - (a.ts||0));
-          saveLocal();
-          renderAll();
-          setStatus('ok','✅ Conectado en tiempo real');
-        },
-        err => {
-          setStatus('err','Error: ' + err.message);
-          showToast('Error Firebase: ' + err.message);
-        }
-      );
+    // Autenticar anónimamente primero, luego conectar Firestore
+    setStatus('wait','Autenticando...');
+    auth.signInAnonymously()
+      .then(() => {
+        setStatus('wait','Conectando base de datos...');
+        fbUnsub = fbDb.collection('expenses')
+          .onSnapshot(
+            snap => {
+              expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a,b) => (b.ts||0) - (a.ts||0));
+              saveLocal();
+              renderAll();
+              setStatus('ok','✅ Conectado en tiempo real');
+            },
+            err => {
+              setStatus('err','Error: ' + err.message);
+              showToast('Error Firebase: ' + err.message);
+            }
+          );
+      })
+      .catch(err => {
+        // Si falla auth anónima, intentar directo igual
+        setStatus('wait','Conectando sin auth...');
+        fbUnsub = fbDb.collection('expenses')
+          .onSnapshot(
+            snap => {
+              expenses = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a,b) => (b.ts||0) - (a.ts||0));
+              saveLocal();
+              renderAll();
+              setStatus('ok','✅ Conectado en tiempo real');
+            },
+            err2 => {
+              setStatus('err','Error: ' + err2.message);
+              showToast('Error Firebase: ' + err2.message);
+            }
+          );
+      });
 
     // guardar config
     const saved = JSON.parse(localStorage.getItem('gh_config')||'{}');
